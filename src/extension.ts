@@ -734,6 +734,13 @@ async function cmdRenameSession(rawArg: any): Promise<void> {
 }
 
 function readClaudeDefaultModel(): string | undefined {
+  // First, extension setting (user chose in VS Code settings)
+  const cfg = vscode.workspace.getConfiguration('claudeSessionManager');
+  const configured = cfg.get<string>('forceModel');
+  if (configured && configured.trim() && configured !== 'session-default') {
+    return configured.trim();
+  }
+  // Fall back to ~/.claude/settings.json's model field
   try {
     const settingsPath = path.join(HOME, '.claude', 'settings.json');
     const s = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
