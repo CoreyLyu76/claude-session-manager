@@ -733,21 +733,30 @@ async function cmdRenameSession(rawArg: any): Promise<void> {
   }
 }
 
+function modelFromSettingsFile(fileName: string): string | undefined {
+  try {
+    const p = path.join(HOME, '.claude', fileName);
+    const s = JSON.parse(fs.readFileSync(p, 'utf-8'));
+    const m = s?.model;
+    if (typeof m === 'string' && m.trim()) { return m.trim(); }
+  } catch { /* missing or unreadable */ }
+  return undefined;
+}
+
+// Resolve which Claude model to pass on --model.
+// Priority: 1) extension's explicit forceModel override
+//           2) ~/.claude/settings.local.json  (Claude Code pins the active
+//              model here — this is what /model writes and what old sessions
+//              otherwise fail to pick up on resume)
+//           3) ~/.claude/settings.json
 function readClaudeDefaultModel(): string | undefined {
-  // First, extension setting (user chose in VS Code settings)
   const cfg = vscode.workspace.getConfiguration('claudeSessionManager');
   const configured = cfg.get<string>('forceModel');
   if (configured && configured.trim() && configured !== 'session-default') {
     return configured.trim();
   }
-  // Fall back to ~/.claude/settings.json's model field
-  try {
-    const settingsPath = path.join(HOME, '.claude', 'settings.json');
-    const s = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-    const m = s?.model;
-    if (typeof m === 'string' && m.trim()) { return m.trim(); }
-  } catch { /* no settings or unreadable */ }
-  return undefined;
+  return modelFromSettingsFile('settings.local.json')
+    ?? modelFromSettingsFile('settings.json');
 }
 
 function buildResumeCommand(tool: Tool, bin: string, sessionId: string, auto = false): string {
