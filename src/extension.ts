@@ -733,10 +733,24 @@ async function cmdRenameSession(rawArg: any): Promise<void> {
   }
 }
 
+function readClaudeDefaultModel(): string | undefined {
+  try {
+    const settingsPath = path.join(HOME, '.claude', 'settings.json');
+    const s = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+    const m = s?.model;
+    if (typeof m === 'string' && m.trim()) { return m.trim(); }
+  } catch { /* no settings or unreadable */ }
+  return undefined;
+}
+
 function buildResumeCommand(tool: Tool, bin: string, sessionId: string, auto = false): string {
   if (tool === 'codex') { return `${bin} resume ${sessionId}`; }
-  if (auto) { return `${bin} --dangerously-skip-permissions --resume ${sessionId}`; }
-  return `${bin} --resume ${sessionId}`;
+  // Old sessions saved an outdated model. Pass --model explicitly to force
+  // the user's current default (from ~/.claude/settings.json) on resume.
+  const model = readClaudeDefaultModel();
+  const modelFlag = model ? ` --model ${model}` : '';
+  if (auto) { return `${bin} --dangerously-skip-permissions${modelFlag} --resume ${sessionId}`; }
+  return `${bin}${modelFlag} --resume ${sessionId}`;
 }
 
 function openResumeTerminal(arg: SessionArg, auto: boolean): void {
@@ -767,6 +781,21 @@ async function cmdResumeSessionAuto(rawArg: any): Promise<void> {
     return;
   }
   openResumeTerminal(arg, true);
+}
+
+async function cmdNewAutoSession(): Promise<void> {
+  const bin = findBinary('claude');
+  const model = readClaudeDefaultModel();
+  const modelFlag = model ? ` --model ${model}` : '';
+  const cmd = `${bin} --dangerously-skip-permissions${modelFlag}`;
+  // Use workspace folder as cwd if any
+  const wsFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const terminal = vscode.window.createTerminal({
+    name: `Auto: 新对话`,
+    cwd: wsFolder,
+  });
+  terminal.show();
+  terminal.sendText(cmd);
 }
 
 async function cmdResumeSessionHappy(rawArg: any): Promise<void> {
@@ -889,6 +918,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('claude-sessions.renameSession', cmdRenameSession),
     vscode.commands.registerCommand('claude-sessions.resumeSession', cmdResumeSession),
     vscode.commands.registerCommand('claude-sessions.resumeSessionAuto', cmdResumeSessionAuto),
+    vscode.commands.registerCommand('claude-sessions.newAutoSession', cmdNewAutoSession),
     vscode.commands.registerCommand('claude-sessions.resumeSessionHappy', cmdResumeSessionHappy),
     vscode.commands.registerCommand('claude-sessions.copyResumeCommand', cmdCopyResumeCommand),
     vscode.commands.registerCommand('claude-sessions.deleteName', cmdDeleteName),

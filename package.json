@@ -2,7 +2,7 @@
   "name": "claude-session-manager",
   "displayName": "Claude Session Manager",
   "description": "Named session manager for Claude Code and Codex CLI — save, name, and resume sessions from a sidebar panel",
-  "version": "1.7.4",
+  "version": "1.8.0",
   "publisher": "conglyu",
   "license": "MIT",
   "repository": {
@@ -124,6 +124,11 @@
         "icon": "$(arrow-swap)"
       },
       {
+        "command": "claude-sessions.newAutoSession",
+        "title": "New Auto Session (skip permissions)",
+        "icon": "$(rocket)"
+      },
+      {
         "command": "claude-sessions.backupNamed",
         "title": "AI Sessions: Backup Named Sessions Now",
         "icon": "$(archive)"
@@ -136,6 +141,11 @@
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "claude-sessions.newAutoSession",
+          "when": "view == claudeSessionsNamed || view == claudeSessionsRecent",
+          "group": "navigation@0"
+        },
         {
           "command": "claude-sessions.switchTool",
           "when": "view == claudeSessionsNamed || view == claudeSessionsRecent",
@@ -215,7 +225,7 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "package": "vsce package",
-    "install-extension": "code --install-extension claude-session-manager-1.7.4.vsix"
+    "install-extension": "code --install-extension claude-session-manager-1.8.0.vsix"
   },
   "devDependencies": {
     "@types/node": "^25.6.0",
