@@ -81,7 +81,7 @@ code --install-extension claude-session-manager-1.3.1.vsix
 ### From source
 
 ```bash
-git clone https://github.com/medialord/claude-session-manager
+git clone https://github.com/CoreyLyu76/claude-session-manager
 cd claude-session-manager
 npm install
 npx tsc -p ./
