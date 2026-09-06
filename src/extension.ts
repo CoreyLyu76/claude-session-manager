@@ -760,7 +760,11 @@ function readClaudeDefaultModel(): string | undefined {
 }
 
 function buildResumeCommand(tool: Tool, bin: string, sessionId: string, auto = false): string {
-  if (tool === 'codex') { return `${bin} resume ${sessionId}`; }
+  if (tool === 'codex') {
+    return auto
+      ? `${bin} resume ${sessionId} --dangerously-bypass-approvals-and-sandbox`
+      : `${bin} resume ${sessionId}`;
+  }
   // Old sessions saved an outdated model. Pass --model explicitly to force
   // the user's current default (from ~/.claude/settings.json) on resume.
   const model = readClaudeDefaultModel();
@@ -792,22 +796,25 @@ async function cmdResumeSession(rawArg: any): Promise<void> {
 async function cmdResumeSessionAuto(rawArg: any): Promise<void> {
   const arg = toSessionArg(rawArg);
   if (!arg) { return; }
-  if (arg.tool === 'codex') {
-    vscode.window.showWarningMessage('Auto mode only applies to Claude sessions.');
-    return;
-  }
   openResumeTerminal(arg, true);
 }
 
+// New auto session follows the view's active tool (Claude ↔ Codex).
 async function cmdNewAutoSession(): Promise<void> {
-  const bin = findBinary('claude');
-  const model = readClaudeDefaultModel();
-  const modelFlag = model ? ` --model ${model}` : '';
-  const cmd = `${bin} --dangerously-skip-permissions${modelFlag}`;
+  const tool = activeTool;
+  const bin = findBinary(tool);
+  let cmd: string;
+  if (tool === 'codex') {
+    cmd = `${bin} --dangerously-bypass-approvals-and-sandbox`;
+  } else {
+    const model = readClaudeDefaultModel();
+    const modelFlag = model ? ` --model ${model}` : '';
+    cmd = `${bin} --dangerously-skip-permissions${modelFlag}`;
+  }
   // Use workspace folder as cwd if any
   const wsFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   const terminal = vscode.window.createTerminal({
-    name: `Auto: 新对话`,
+    name: `Auto: ${TOOL_LABEL[tool]} 新对话`,
     cwd: wsFolder,
   });
   terminal.show();

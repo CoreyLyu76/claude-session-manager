@@ -2,7 +2,7 @@
   "name": "claude-session-manager",
   "displayName": "Claude Session Manager",
   "description": "Named session manager for Claude Code and Codex CLI — save, name, and resume sessions from a sidebar panel",
-  "version": "1.8.2",
+  "version": "1.9.0",
   "publisher": "conglyu",
   "license": "MIT",
   "repository": {
@@ -50,7 +50,17 @@
         "claudeSessionManager.forceModel": {
           "type": "string",
           "default": "session-default",
-          "enum": ["session-default", "opus", "sonnet", "haiku", "fable", "claude-opus-4-8", "claude-sonnet-5", "claude-haiku-4-5", "claude-fable-5"],
+          "enum": [
+            "session-default",
+            "opus",
+            "sonnet",
+            "haiku",
+            "fable",
+            "claude-opus-4-8",
+            "claude-sonnet-5",
+            "claude-haiku-4-5",
+            "claude-fable-5"
+          ],
           "description": "Force a Claude model when resuming sessions. 'session-default' uses whatever the session was saved with; anything else adds --model <value>."
         }
       }
@@ -176,7 +186,7 @@
         },
         {
           "command": "claude-sessions.resumeSessionAuto",
-          "when": "viewItem == named-claude || viewItem == unnamed-claude",
+          "when": "viewItem == named-claude || viewItem == unnamed-claude || viewItem == named-codex || viewItem == unnamed-codex",
           "group": "inline@2"
         },
         {
@@ -191,7 +201,7 @@
         },
         {
           "command": "claude-sessions.resumeSessionAuto",
-          "when": "viewItem == named-claude || viewItem == unnamed-claude",
+          "when": "viewItem == named-claude || viewItem == unnamed-claude || viewItem == named-codex || viewItem == unnamed-codex",
           "group": "navigation@0"
         },
         {
