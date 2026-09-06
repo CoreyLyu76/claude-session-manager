@@ -7,7 +7,8 @@ VS Code extension for managing [Claude Code](https://claude.ai/code) and [Codex 
 - **Named Sessions** — star important conversations with memorable names
 - **Two Tools, One Sidebar** — toggle between Claude and Codex from the same panel
 - **One-click Resume** — click any session to open it in a VS Code terminal
-- **Auto Mode (Claude)** — 🚀 button on each Claude session resumes with `--dangerously-skip-permissions` (no more permission prompts)
+- **Auto Mode** — 🚀 button resumes any session in full-auto: Claude with `--dangerously-skip-permissions`, Codex with `--dangerously-bypass-approvals-and-sandbox`
+- **Model Pinning** — resumed Claude sessions always run your current default model (old sessions no longer wake up on a stale model)
 - **Recent Sessions** — browse unnamed sessions and name the ones you need
 - **Inline Actions** — Resume / Auto-Resume / Remove buttons on hover
 
@@ -16,7 +17,7 @@ VS Code extension for managing [Claude Code](https://claude.ai/code) and [Codex 
 1. Click the **AI Sessions** icon in the activity bar (💬)
 2. **Named** panel shows your starred sessions
 3. **Recent** panel shows your latest unnamed sessions
-4. Click a session to resume normally, or click 🚀 for Auto Mode (Claude only)
+4. Click a session to resume normally, or click 🚀 for Auto Mode (Claude & Codex)
 5. Right-click for more actions: rename, copy command, open file
 
 ### Switching between Claude and Codex
