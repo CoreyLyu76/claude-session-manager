@@ -2,7 +2,7 @@
   "name": "claude-session-manager",
   "displayName": "Claude Session Manager",
   "description": "Named session manager for Claude Code and Codex CLI — save, name, and resume sessions from a sidebar panel",
-  "version": "1.9.1",
+  "version": "1.9.2",
   "publisher": "CoreyLyu",
   "license": "MIT",
   "repository": {
