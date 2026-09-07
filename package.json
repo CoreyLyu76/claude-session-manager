@@ -2,7 +2,7 @@
   "name": "claude-codex-session-manager",
   "displayName": "Claude & Codex Session Manager",
   "description": "Named session manager for Claude Code and Codex CLI — save, name, and resume sessions from a sidebar panel",
-  "version": "1.9.4",
+  "version": "1.10.0",
   "publisher": "CoreyLyu",
   "license": "MIT",
   "repository": {
@@ -153,6 +153,11 @@
         "command": "claude-sessions.restoreMissing",
         "title": "AI Sessions: Restore Missing Named Sessions",
         "icon": "$(history)"
+      },
+      {
+        "command": "claude-sessions.updateAllModels",
+        "title": "Update All Sessions to Current Model",
+        "icon": "$(sync)"
       }
     ],
     "menus": {
@@ -161,6 +166,11 @@
           "command": "claude-sessions.newAutoSession",
           "when": "view == claudeSessionsNamed || view == claudeSessionsRecent",
           "group": "navigation@0"
+        },
+        {
+          "command": "claude-sessions.updateAllModels",
+          "when": "view == claudeSessionsNamed || view == claudeSessionsRecent",
+          "group": "navigation@1"
         },
         {
           "command": "claude-sessions.switchTool",

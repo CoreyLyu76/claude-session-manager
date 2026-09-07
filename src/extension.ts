@@ -821,6 +821,74 @@ async function cmdNewAutoSession(): Promise<void> {
   terminal.sendText(cmd);
 }
 
+// Rewrite the persisted model in all Claude session JSONLs to the current
+// default. Claude resumes a session on whatever model is stored in its file,
+// so after a model upgrade every old conversation silently stays on the old
+// model. This migrates them all at once: backup first, skip live sessions.
+async function cmdUpdateAllModels(): Promise<void> {
+  const target = readClaudeDefaultModel();
+  if (!target) {
+    vscode.window.showErrorMessage('No default model found in ~/.claude/settings.local.json or settings.json.');
+    return;
+  }
+  const choice = await vscode.window.showWarningMessage(
+    `Rewrite the saved model of ALL Claude sessions to "${target}"? ` +
+    'Files are backed up first; sessions currently running are skipped.',
+    { modal: true }, 'Update All'
+  );
+  if (choice !== 'Update All') { return; }
+
+  // Sessions with a live `claude --resume <id>` process must not be touched.
+  let liveIds = new Set<string>();
+  try {
+    const ps = execSync('ps -axww -o command', { encoding: 'utf-8' });
+    liveIds = new Set([...ps.matchAll(/--resume\s+([0-9a-f-]{36})/g)].map(m => m[1]));
+  } catch { /* ps unavailable; proceed without skip list */ }
+
+  const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const backupDir = path.join(HOME, '.claude', `session-model-patch-backup-${stamp}`);
+  const modelRe = /"model":"claude-[^"]+"/g;
+  const replacement = `"model":"${target}"`;
+
+  await vscode.window.withProgress(
+    { location: vscode.ProgressLocation.Notification, title: 'Updating session models', cancellable: false },
+    async (progress) => {
+      const files: string[] = [];
+      for (const dir of fs.readdirSync(CLAUDE_PROJECTS_DIR)) {
+        const full = path.join(CLAUDE_PROJECTS_DIR, dir);
+        try {
+          if (!fs.statSync(full).isDirectory()) { continue; }
+          for (const f of fs.readdirSync(full)) {
+            if (f.endsWith('.jsonl')) { files.push(path.join(full, f)); }
+          }
+        } catch { /* unreadable project dir */ }
+      }
+      let patched = 0, skippedLive = 0;
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (i % 20 === 0) { progress.report({ message: `${i}/${files.length}` }); }
+        if (liveIds.has(path.basename(file, '.jsonl'))) { skippedLive++; continue; }
+        let text: string;
+        try { text = fs.readFileSync(file, 'utf-8'); } catch { continue; }
+        if (!modelRe.test(text)) { continue; }
+        modelRe.lastIndex = 0;
+        const updated = text.replace(modelRe, replacement);
+        if (updated === text) { continue; }
+        fs.mkdirSync(backupDir, { recursive: true });
+        fs.copyFileSync(file, path.join(backupDir, path.basename(file)));
+        fs.writeFileSync(file, updated);
+        patched++;
+      }
+      const skipNote = skippedLive ? `, ${skippedLive} live session(s) skipped` : '';
+      vscode.window.showInformationMessage(
+        patched
+          ? `Updated ${patched} session(s) to ${target}${skipNote}. Backup: ${backupDir}`
+          : `All sessions already on ${target}${skipNote}.`
+      );
+    }
+  );
+}
+
 async function cmdResumeSessionHappy(rawArg: any): Promise<void> {
   const arg = toSessionArg(rawArg);
   if (!arg) { return; }
@@ -942,6 +1010,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('claude-sessions.resumeSession', cmdResumeSession),
     vscode.commands.registerCommand('claude-sessions.resumeSessionAuto', cmdResumeSessionAuto),
     vscode.commands.registerCommand('claude-sessions.newAutoSession', cmdNewAutoSession),
+    vscode.commands.registerCommand('claude-sessions.updateAllModels', cmdUpdateAllModels),
     vscode.commands.registerCommand('claude-sessions.resumeSessionHappy', cmdResumeSessionHappy),
     vscode.commands.registerCommand('claude-sessions.copyResumeCommand', cmdCopyResumeCommand),
     vscode.commands.registerCommand('claude-sessions.deleteName', cmdDeleteName),
