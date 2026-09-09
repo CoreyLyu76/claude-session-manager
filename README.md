@@ -1,5 +1,9 @@
 # Claude Session Manager
 
+[![VS Marketplace](https://img.shields.io/visual-studio-marketplace/v/CoreyLyu.claude-codex-session-manager?label=VS%20Marketplace&color=blue)](https://marketplace.visualstudio.com/items?itemName=CoreyLyu.claude-codex-session-manager)
+[![Open VSX](https://img.shields.io/open-vsx/dt/CoreyLyu/claude-codex-session-manager?label=Open%20VSX%20Downloads&color=purple)](https://open-vsx.org/extension/CoreyLyu/claude-codex-session-manager)
+[![GitHub stars](https://img.shields.io/github/stars/CoreyLyu76/claude-session-manager?style=social)](https://github.com/CoreyLyu76/claude-session-manager)
+
 VS Code extension for managing [Claude Code](https://claude.ai/code) and [Codex CLI](https://github.com/openai/codex) sessions. Name your conversations, switch tools, and resume from a sidebar — no more `/resume` hunting.
 
 ## Features
@@ -92,3 +96,7 @@ code --install-extension claude-session-manager-*.vsix
 ## License
 
 MIT
+
+---
+
+If this extension saves you time, [a ⭐ on GitHub](https://github.com/CoreyLyu76/claude-session-manager) helps others find it.
