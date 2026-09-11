@@ -1020,10 +1020,26 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('claude-sessions.restoreMissing', cmdRestoreMissingNamed),
   );
 
-  // Auto-backup on activation, then every BACKUP_INTERVAL_MS.
-  // Run the first pass async so activation isn't blocked.
-  setTimeout(() => { backupNamedSessions(); }, 2000);
-  const interval = setInterval(() => { backupNamedSessions(); }, BACKUP_INTERVAL_MS);
+  // Claude Code prunes old session files, which silently makes named entries
+  // disappear from the tree. Restore from backup before backing up, so a
+  // pruned-but-named session comes back on its own instead of waiting for the
+  // user to notice and run the command manually.
+  setTimeout(() => {
+    try {
+      const r = restoreMissingNamedSessions();
+      if (r.restored.length) {
+        vscode.window.showInformationMessage(
+          `Restored ${r.restored.length} named session(s) removed by Claude's cleanup.`
+        );
+        refreshAll();
+      }
+    } catch { /* restore is best-effort */ }
+    backupNamedSessions();
+  }, 2000);
+  const interval = setInterval(() => {
+    try { restoreMissingNamedSessions(); } catch { /* best-effort */ }
+    backupNamedSessions();
+  }, BACKUP_INTERVAL_MS);
   context.subscriptions.push({ dispose: () => clearInterval(interval) });
 }
 
