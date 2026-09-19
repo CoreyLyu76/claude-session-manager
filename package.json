@@ -2,7 +2,7 @@
   "name": "claude-codex-session-manager",
   "displayName": "Claude & Codex Session Manager",
   "description": "Named session manager for Claude Code and Codex CLI — save, name, and resume sessions from a sidebar panel",
-  "version": "1.11.0",
+  "version": "1.12.0",
   "publisher": "CoreyLyu",
   "license": "MIT",
   "repository": {
@@ -158,6 +158,11 @@
         "command": "claude-sessions.updateAllModels",
         "title": "Update All Sessions to Current Model",
         "icon": "$(sync)"
+      },
+      {
+        "command": "claude-sessions.nameCurrentSession",
+        "title": "Name Current Session (add to Named)",
+        "icon": "$(star-full)"
       }
     ],
     "menus": {
@@ -243,6 +248,17 @@
           "command": "claude-sessions.openSessionFolder",
           "when": "viewItem == named-claude || viewItem == unnamed-claude || viewItem == named-codex || viewItem == unnamed-codex",
           "group": "navigation@4"
+        }
+      ],
+      "terminal/title/context": [
+        {
+          "command": "claude-sessions.nameCurrentSession",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "claude-sessions.nameCurrentSession"
         }
       ]
     }

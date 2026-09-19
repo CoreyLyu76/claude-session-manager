@@ -107,7 +107,7 @@ function getClaudeProjectsSubDirs(): string[] {
 // Extract original cwd from a Claude JSONL — first line carrying a `cwd` field.
 function extractClaudeCwd(filePath: string): string | undefined {
   try {
-    const content = fs.readFileSync(filePath, 'utf-8');
+    const content = readHead(filePath);
     const lines = content.split('\n');
     for (const line of lines) {
       if (!line.trim() || !line.includes('"cwd"')) { continue; }
@@ -167,7 +167,7 @@ function isAutoTemplate(t: string): boolean {
 // auto-template — i.e. nobody actually typed anything.
 function isTemplateOnlyClaudeSession(filePath: string): boolean {
   try {
-    const content = fs.readFileSync(filePath, 'utf-8');
+    const content = readHead(filePath);
     const lines = content.split('\n');
     for (const line of lines) {
       if (!line.trim()) { continue; }
@@ -216,7 +216,7 @@ function isPureMetadata(t: string): boolean {
 function extractClaudeTitle(filePath: string): string {
   if (!fs.existsSync(filePath)) { return '(unknown)'; }
   try {
-    const content = fs.readFileSync(filePath, 'utf-8');
+    const content = readHead(filePath);
     const lines = content.split('\n');
     // Collect up to 5 non-metadata, non-auto-template user messages, then pick
     // the best title from them. Short greetings like "hi" / "Poptale" get
@@ -257,23 +257,76 @@ function extractClaudeTitle(filePath: string): string {
   }
 }
 
+// Read only the head of a file instead of slurping it whole. Session logs run
+// to tens of MB and the title always lives in the first handful of records;
+// reading everything is what made tool switching crawl.
+function readHead(filePath: string, maxBytes = 512 * 1024): string {
+  let fd: number | undefined;
+  try {
+    fd = fs.openSync(filePath, 'r');
+    const size = fs.fstatSync(fd).size;
+    const len = Math.min(size, maxBytes);
+    const buf = Buffer.allocUnsafe(len);
+    fs.readSync(fd, buf, 0, len, 0);
+    return buf.toString('utf-8');
+  } catch {
+    return '';
+  } finally {
+    if (fd !== undefined) { try { fs.closeSync(fd); } catch { /* ignore */ } }
+  }
+}
+
+// Injected context (AGENTS.md, skill instructions, tool output echoes) shows up
+// as user-role records, so skip those and take the first line a human typed.
+function isInjectedText(t: string): boolean {
+  return !t
+    || t.startsWith('# AGENTS.md')
+    || t.startsWith('<INSTRUCTIONS')
+    || t.startsWith('<skills_instructions')
+    || t.startsWith('<user_instructions')
+    || t.startsWith('<environment_context')
+    || t.startsWith('⏺ ');
+}
+
 function extractCodexTitle(filePath: string): string {
   if (!fs.existsSync(filePath)) { return '(unknown)'; }
   try {
-    const content = fs.readFileSync(filePath, 'utf-8');
-    const lines = content.split('\n');
-    for (const line of lines) {
+    // The opening records are injected context and pasted tool output, so the
+    // first line a human typed can sit well past the start of a large log.
+    // 4 MB covers those without ever reading a multi-GB file end to end.
+    const content = readHead(filePath, 4 * 1024 * 1024);
+    let pastedFallback = '';
+    for (const line of content.split('\n')) {
       if (!line.trim()) { continue; }
       let d: any;
       try { d = JSON.parse(line); } catch { continue; }
-      if (d.type === 'event_msg' && d.payload?.type === 'user_message') {
-        const t = String(d.payload.message ?? '').trim();
-        if (!t) { continue; }
-        if (t.startsWith('# AGENTS.md') || t.startsWith('<INSTRUCTIONS')) { continue; }
-        return truncate(t);
+      const p = d.payload ?? {};
+      let t = '';
+      // Old format: event_msg / user_message
+      if (d.type === 'event_msg' && p.type === 'user_message') {
+        t = String(p.message ?? '').trim();
+      // Current format (codex 0.15x): response_item / message with role=user
+      } else if (p.type === 'message' && p.role === 'user') {
+        t = (Array.isArray(p.content) ? p.content : [])
+          .map((c: any) => String(c?.text ?? ''))
+          .join('')
+          .trim();
       }
+      if (!t) { continue; }
+      // Strip attachment markers so a message that opens with a pasted image
+      // still shows the words next to it rather than the file path.
+      t = t.replace(/<image\b[^>]*>/g, '').trim();
+      if (!t) { continue; }
+      // Pasted assistant/tool output: keep the first readable line as a last
+      // resort, but keep scanning for something the user actually typed.
+      if (t.startsWith('⏺ ')) {
+        if (!pastedFallback) { pastedFallback = firstMeaningfulLine(t.slice(2)); }
+        continue;
+      }
+      if (isInjectedText(t)) { continue; }
+      return truncate(firstMeaningfulLine(t));
     }
-    return '(empty)';
+    return pastedFallback ? truncate(pastedFallback) : '(empty)';
   } catch {
     return '(error)';
   }
@@ -299,7 +352,7 @@ function listCodexSessionFiles(): string[] {
 
 function getCodexSessionMeta(filePath: string): { sessionId: string | null; cwd?: string } {
   try {
-    const content = fs.readFileSync(filePath, 'utf-8');
+    const content = readHead(filePath, 64 * 1024);
     const firstNewline = content.indexOf('\n');
     const firstLine = firstNewline === -1 ? content : content.slice(0, firstNewline);
     const meta = JSON.parse(firstLine);
@@ -669,6 +722,31 @@ function prefixCd(cwd: string | undefined, cmd: string): string {
   return `cd ${shellQuote(cwd)} ${sep} ${cmd}`;
 }
 
+// Name the session you're actually working in, without going to the sidebar.
+// The most recently touched session of the active tool is the one in front of
+// you, so offer that first and fall back to the full picker.
+async function cmdNameCurrentSession(): Promise<void> {
+  const sessions = getAllSessions(activeTool);
+  const latest = sessions.find(s => !s.isNamed) ?? sessions[0];
+  if (!latest) {
+    vscode.window.showInformationMessage(`No ${activeTool} sessions found.`);
+    return;
+  }
+  const name = await vscode.window.showInputBox({
+    prompt: `Name the current ${TOOL_LABEL[activeTool]} session`,
+    placeHolder: 'e.g. syncap-payment, deploy-script',
+    value: latest.name ?? '',
+    validateInput: (v) => v.trim() ? undefined : 'Name cannot be empty',
+  });
+  if (!name) { return; }
+  const names = loadNames();
+  names[latest.sessionId] = { name: name.trim(), title: latest.title, tool: activeTool };
+  saveNames(names);
+  refreshAll();
+  backupNamedSessions();
+  vscode.window.showInformationMessage(`Saved as "${name.trim()}" — find it under Named.`);
+}
+
 async function cmdNameSession(rawArg?: any): Promise<void> {
   const arg = toSessionArg(rawArg);
   const tool: Tool = arg?.tool ?? activeTool;
@@ -1011,6 +1089,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand('claude-sessions.resumeSessionAuto', cmdResumeSessionAuto),
     vscode.commands.registerCommand('claude-sessions.newAutoSession', cmdNewAutoSession),
     vscode.commands.registerCommand('claude-sessions.updateAllModels', cmdUpdateAllModels),
+    vscode.commands.registerCommand('claude-sessions.nameCurrentSession', cmdNameCurrentSession),
     vscode.commands.registerCommand('claude-sessions.resumeSessionHappy', cmdResumeSessionHappy),
     vscode.commands.registerCommand('claude-sessions.copyResumeCommand', cmdCopyResumeCommand),
     vscode.commands.registerCommand('claude-sessions.deleteName', cmdDeleteName),
